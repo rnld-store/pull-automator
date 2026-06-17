@@ -97,11 +97,24 @@ $env:PA_WEBHOOK_SECRET = "um-segredo-forte"
 .\pull-automator.exe
 ```
 
-Há também o script `run.ps1` (incluído no pacote Windows) que recebe os valores
-como parâmetros e já define as variáveis:
+Há também o script `run.ps1` (incluído no pacote Windows), que é **interativo**:
+rode sem argumentos e ele pergunta cada configuração (com valor padrão e
+validação), perguntando só o que faz sentido para o modo escolhido e mascarando
+o segredo do webhook:
 
 ```powershell
-.\run.ps1 -RepoPath C:\srv\meu-repo -Mode polling -PollInterval 30s
+.\run.ps1
+```
+
+Você também pode passar valores por parâmetro — eles pulam o prompt
+correspondente — e usar `-NonInteractive` para não perguntar nada (automação):
+
+```powershell
+# informa o repo, pergunta o resto
+.\run.ps1 -RepoPath C:\srv\meu-repo
+
+# sem prompts
+.\run.ps1 -NonInteractive -RepoPath C:\srv\meu-repo -Mode webhook -WebhookSecret "segredo-forte"
 ```
 
 > Se aparecer **"não está assinado digitalmente"** ao usar o `run.ps1`, libere
