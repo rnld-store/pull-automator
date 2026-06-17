@@ -6,8 +6,12 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
+	"sort"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/rnld-dev/pull-automator/internal/logging"
 )
 
 // Puller executa "git pull" em um repositório, serializando as execuções
@@ -70,9 +74,28 @@ func (p *Puller) Pull(ctx context.Context) error {
 	// só notificamos (nível Info) quando houve mudança de fato. Pulls sem
 	// novidade ficam em Debug para não poluir o canal de log no modo polling.
 	if before != after {
-		p.log.Info("git pull aplicou novas mudanças",
+		rev := short(after)
+		subject := p.commitSubject(ctx, after)
+		resources := p.changedResources(ctx, before, after)
+
+		// Título no formato esperado pelo Discord, com o resumo do commit.
+		title := "✅ Auto-pull OK " + rev
+		if subject != "" {
+			title += " - " + subject
+		}
+
+		// Corpo: lista de resources do servidor (FiveM/RedM) que precisam ser
+		// reiniciados por terem sido alterados neste pull.
+		var body string
+		if len(resources) > 0 {
+			body = "🔄 Restart pendente: " + strings.Join(resources, ", ")
+		}
+
+		p.log.Info(title,
+			logging.MsgBodyKey, body,
 			"de", short(before),
-			"para", short(after),
+			"para", rev,
+			"recursos", strings.Join(resources, ","),
 			"duracao", time.Since(start).String(),
 		)
 	} else {
@@ -90,6 +113,74 @@ func (p *Puller) headRev(ctx context.Context) string {
 		return ""
 	}
 	return string(bytes.TrimSpace(out))
+}
+
+// commitSubject retorna o assunto (primeira linha) do commit rev, ou "" se não
+// conseguir obtê-lo.
+func (p *Puller) commitSubject(ctx context.Context, rev string) string {
+	out, err := exec.CommandContext(ctx, "git", "-C", p.repoPath, "log", "-1", "--format=%s", rev).Output()
+	if err != nil {
+		return ""
+	}
+	return string(bytes.TrimSpace(out))
+}
+
+// changedResources lista, em ordem alfabética, os resources do servidor
+// (FiveM/RedM) afetados entre dois commits. O repositório apontado é a pasta
+// "resources" do servidor: cada arquivo alterado é mapeado para o resource que
+// o contém. As pastas-categoria entre colchetes (ex.: "[gameplay]"), que o
+// FiveM usa apenas para agrupar resources, são ignoradas.
+func (p *Puller) changedResources(ctx context.Context, before, after string) []string {
+	// core.quotepath=false mantém caracteres não-ASCII legíveis no output.
+	out, err := exec.CommandContext(ctx, "git", "-C", p.repoPath,
+		"-c", "core.quotepath=false", "diff", "--name-only", before, after).Output()
+	if err != nil {
+		p.log.Warn("não foi possível listar os resources alterados", "erro", err)
+		return nil
+	}
+
+	seen := make(map[string]struct{})
+	var resources []string
+	for _, line := range strings.Split(string(out), "\n") {
+		name := resourceName(line)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		resources = append(resources, name)
+	}
+	sort.Strings(resources)
+	return resources
+}
+
+// resourceName extrai o nome do resource a partir do caminho de um arquivo
+// (relativo à pasta "resources"). Segmentos entre colchetes são categorias e
+// são ignorados; o resource é o primeiro segmento não-categoria que ainda
+// tenha um arquivo abaixo dele. Retorna "" quando o caminho não pertence a
+// nenhum resource (ex.: um arquivo solto na raiz ou dentro de uma categoria).
+func resourceName(path string) string {
+	segments := strings.Split(strings.TrimSpace(path), "/")
+	for i, seg := range segments {
+		if isCategory(seg) {
+			continue
+		}
+		// Precisa haver ao menos mais um segmento abaixo (o arquivo) para que
+		// este segmento seja um diretório de resource, e não o próprio arquivo.
+		if i == len(segments)-1 {
+			return ""
+		}
+		return seg
+	}
+	return ""
+}
+
+// isCategory indica se um segmento de caminho é uma pasta-categoria do FiveM,
+// isto é, um nome entre colchetes como "[gameplay]" ou "[standalone]".
+func isCategory(seg string) bool {
+	return len(seg) >= 2 && strings.HasPrefix(seg, "[") && strings.HasSuffix(seg, "]")
 }
 
 func short(rev string) string {

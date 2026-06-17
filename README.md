@@ -1,9 +1,17 @@
 # pull-automator
 
+[![Último release](https://img.shields.io/github/v/release/rnld-store/pull-automator?label=último%20release&sort=semver)](https://github.com/rnld-store/pull-automator/releases/latest)
+
+📦 **[Baixar a última versão →](https://github.com/rnld-store/pull-automator/releases/latest)**
+
 Serviço de papel único: manter um repositório git local sincronizado rodando
 `git pull` automaticamente. Funciona em **Linux e Windows** (amd64/arm64), é um
 binário único sem dependências (só precisa do `git` no `PATH`) e toda a
 configuração vem de variáveis de ambiente.
+
+Pensado para **servidores FiveM/RedM**: aponte `PA_REPO_PATH` para a pasta
+`resources` do servidor e, a cada pull com novidades, a notificação do Discord
+já indica quais resources mudaram e precisam de restart.
 
 Opera em um de dois modos:
 
@@ -34,7 +42,7 @@ Toda a configuração é feita por variáveis de ambiente com prefixo `PA_`:
 
 | Variável                 | Obrigatória | Padrão           | Descrição |
 |--------------------------|-------------|------------------|-----------|
-| `PA_REPO_PATH`           | sim         | —                | Caminho do repositório git onde o pull roda. |
+| `PA_REPO_PATH`           | sim         | —                | Caminho do repositório git onde o pull roda. Em FiveM/RedM, a pasta `resources` do servidor. |
 | `PA_REMOTE`              | não         | `origin`         | Remote usado no `git pull`. |
 | `PA_BRANCH`              | não         | _(upstream)_     | Branch do pull. Vazio usa o upstream da branch atual. |
 | `PA_MODE`                | não         | `polling`        | `polling` ou `webhook`. |
@@ -58,8 +66,10 @@ Toda a configuração é feita por variáveis de ambiente com prefixo `PA_`:
 Cada versão publicada gera binários prontos na aba **Releases** do repositório
 no GitHub:
 
-1. Acesse **Releases** (no menu lateral direito da página do repositório) e abra
-   a versão mais recente.
+👉 **Última versão: https://github.com/rnld-store/pull-automator/releases/latest**
+
+1. Abra o link acima (ou acesse **Releases** no menu lateral direito da página do
+   repositório).
 2. Em **Assets**, baixe o pacote do seu sistema:
    - Windows: `pull-automator_vX.Y.Z_windows_amd64.zip` (ou `arm64`);
    - Linux: `pull-automator_vX.Y.Z_linux_amd64.tar.gz` (ou `arm64`).
@@ -239,7 +249,16 @@ Discord não derruba o serviço — no máximo descarta notificações se a fila
 Cada mensagem vira um *embed* colorido por nível (verde = info, amarelo = warn,
 vermelho = error). Com o padrão `PA_DISCORD_LEVEL=INFO`, você recebe:
 
-- ✅ **pull com mudanças aplicadas** (com o hash de/para);
+- ✅ **pull com mudanças aplicadas** — com o hash e o assunto do commit, e a
+  lista de resources do servidor que precisam de restart:
+
+  ```
+  ✅ Auto-pull OK e81e7c0 - feat(beco-works): missões de campo (sidequests) + fix de índice de delivery
+  🔄 Restart pendente: beco_hud, beco-works, black_garages_v2, black_groups, taskbar
+  ```
+
+  Os resources são deduzidos dos arquivos alterados no pull. As pastas-categoria
+  do FiveM (entre colchetes, ex.: `[gameplay]`) são ignoradas no mapeamento.
 - ❌ **falha no `git pull`** (com a saída do git);
 - ⚠️ **assinatura de webhook inválida** (alerta de segurança, no modo webhook);
 - início e encerramento do serviço.

@@ -10,6 +10,12 @@ import (
 	"github.com/rnld-dev/pull-automator/internal/notify/discord"
 )
 
+// MsgBodyKey é uma chave de atributo especial: quando presente em um registro,
+// seu valor (string) é usado como corpo da notificação do Discord, no lugar da
+// renderização padrão "chave: valor" dos demais atributos. O atributo continua
+// aparecendo normalmente no log estruturado do console.
+const MsgBodyKey = "discord_body"
+
 // DiscordHandler é um slog.Handler decorator: encaminha todo registro para o
 // handler base (console) e, para registros de nível >= level, também enfileira
 // uma notificação no Discord.
@@ -84,20 +90,37 @@ func (h *DiscordHandler) groupPrefix() string {
 // vira o título e os atributos viram linhas "chave: valor" no corpo.
 func (h *DiscordHandler) toMessage(r slog.Record) discord.Message {
 	var b strings.Builder
+	var bodyOverride string
+	var hasOverride bool
+
+	capture := func(prefix string, a slog.Attr) {
+		if a.Key == MsgBodyKey {
+			bodyOverride = a.Value.String()
+			hasOverride = true
+			return
+		}
+		writeAttr(&b, prefix, a)
+	}
+
 	// Atributos acumulados via WithAttrs já têm o prefixo de grupo embutido.
 	for _, a := range h.attrs {
-		writeAttr(&b, "", a)
+		capture("", a)
 	}
 	prefix := h.groupPrefix()
 	r.Attrs(func(a slog.Attr) bool {
-		writeAttr(&b, prefix, a)
+		capture(prefix, a)
 		return true
 	})
+
+	body := strings.TrimRight(b.String(), "\n")
+	if hasOverride {
+		body = bodyOverride
+	}
 
 	return discord.Message{
 		Level: r.Level,
 		Title: r.Message,
-		Body:  strings.TrimRight(b.String(), "\n"),
+		Body:  body,
 		Time:  r.Time,
 	}
 }
