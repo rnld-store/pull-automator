@@ -21,7 +21,8 @@ const (
 // variáveis de ambiente (prefixo PA_).
 type Config struct {
 	// RepoPath é o caminho absoluto do repositório git onde o pull roda. Em
-	// servidores FiveM/RedM, é a pasta "resources" do servidor.
+	// servidores FiveM/RedM, é o repositório do servidor — tanto a raiz que
+	// contém a pasta "resources" quanto a própria pasta "resources".
 	RepoPath string
 	// Remote e Branch controlam o "git pull <remote> <branch>". Branch
 	// vazio deixa o git resolver o upstream da branch atual.

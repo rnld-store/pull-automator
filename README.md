@@ -9,9 +9,10 @@ Serviço de papel único: manter um repositório git local sincronizado rodando
 binário único sem dependências (só precisa do `git` no `PATH`) e toda a
 configuração vem de variáveis de ambiente.
 
-Pensado para **servidores FiveM/RedM**: aponte `PA_REPO_PATH` para a pasta
-`resources` do servidor e, a cada pull com novidades, a notificação do Discord
-já indica quais resources mudaram e precisam de restart.
+Pensado para **servidores FiveM/RedM**: aponte `PA_REPO_PATH` para o repositório
+do servidor (a raiz com a pasta `resources` ou a própria pasta `resources`) e, a
+cada pull com novidades, a notificação do Discord já indica quais resources
+mudaram e precisam de restart.
 
 Opera em um de dois modos:
 
@@ -42,7 +43,7 @@ Toda a configuração é feita por variáveis de ambiente com prefixo `PA_`:
 
 | Variável                 | Obrigatória | Padrão           | Descrição |
 |--------------------------|-------------|------------------|-----------|
-| `PA_REPO_PATH`           | sim         | —                | Caminho do repositório git onde o pull roda. Em FiveM/RedM, a pasta `resources` do servidor. |
+| `PA_REPO_PATH`           | sim         | —                | Caminho do repositório git onde o pull roda. Em FiveM/RedM, o repositório do servidor (raiz com `resources`, ou a própria pasta `resources`). |
 | `PA_REMOTE`              | não         | `origin`         | Remote usado no `git pull`. |
 | `PA_BRANCH`              | não         | _(upstream)_     | Branch do pull. Vazio usa o upstream da branch atual. |
 | `PA_MODE`                | não         | `polling`        | `polling` ou `webhook`. |
@@ -257,8 +258,10 @@ vermelho = error). Com o padrão `PA_DISCORD_LEVEL=INFO`, você recebe:
   🔄 Restart pendente: beco_hud, beco-works, black_garages_v2, black_groups, taskbar
   ```
 
-  Os resources são deduzidos dos arquivos alterados no pull. As pastas-categoria
-  do FiveM (entre colchetes, ex.: `[gameplay]`) são ignoradas no mapeamento.
+  Cada arquivo alterado no pull é mapeado para o resource que o contém,
+  identificado pelo seu manifesto (`fxmanifest.lua`/`__resource.lua`) — então a
+  profundidade do caminho e as pastas-categoria do FiveM (entre colchetes, ex.:
+  `[scripts]`) não importam.
 - ❌ **falha no `git pull`** (com a saída do git);
 - ⚠️ **assinatura de webhook inválida** (alerta de segurança, no modo webhook);
 - início e encerramento do serviço.

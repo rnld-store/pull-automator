@@ -1,27 +1,54 @@
 package puller
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestResourceName(t *testing.T) {
+	// Monta uma árvore parecida com a de um servidor FiveM, com o ".git" na raiz
+	// do servidor e os resources dentro de "resources" (alguns em categorias
+	// entre colchetes), cada um com seu fxmanifest.lua.
+	repo := t.TempDir()
+	for _, dir := range []string{
+		"resources/vrp",
+		"resources/[scripts]/grime",
+		"resources/[maps]/cfx-gabz",
+		"resources/[scripts]/[sub]/aninhado",
+	} {
+		full := filepath.Join(repo, filepath.FromSlash(dir))
+		if err := os.MkdirAll(full, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(full, "fxmanifest.lua"), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	cases := []struct {
 		path string
 		want string
 	}{
-		// Resource na raiz da pasta resources.
-		{"rnld_api/server/main.lua", "rnld_api"},
-		{"taskbar/fxmanifest.lua", "taskbar"},
-		// Resource dentro de uma categoria entre colchetes.
-		{"[gameplay]/rnld_api/client.lua", "rnld_api"},
-		{"[local]/[hud]/rnld_api/ui/index.html", "rnld_api"},
-		// Arquivo solto na raiz: não pertence a resource nenhum.
+		// Resource direto em resources/.
+		{"resources/vrp/fxmanifest.lua", "vrp"},
+		{"resources/vrp/server/main.lua", "vrp"},
+		// Resource dentro de uma categoria.
+		{"resources/[scripts]/grime/client.lua", "grime"},
+		{"resources/[maps]/cfx-gabz/stream/a.ydr", "cfx-gabz"},
+		// Resource dentro de categorias aninhadas.
+		{"resources/[scripts]/[sub]/aninhado/x.lua", "aninhado"},
+		// Arquivos fora de qualquer resource.
 		{"server.cfg", ""},
-		// Arquivo solto dentro de uma categoria: também não é um resource.
-		{"[gameplay]/leiame.txt", ""},
+		{"resources/server.cfg", ""},
+		{"resources/[scripts]/leiame.txt", ""},
+		// Caminho de um resource inexistente no disco (ex.: removido no pull).
+		{"resources/[scripts]/fantasma/main.lua", ""},
 		// Caminho vazio.
 		{"", ""},
 	}
 	for _, c := range cases {
-		if got := resourceName(c.path); got != c.want {
+		if got := resourceName(repo, c.path); got != c.want {
 			t.Errorf("resourceName(%q) = %q, queria %q", c.path, got, c.want)
 		}
 	}

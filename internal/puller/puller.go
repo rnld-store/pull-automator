@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -126,10 +128,11 @@ func (p *Puller) commitSubject(ctx context.Context, rev string) string {
 }
 
 // changedResources lista, em ordem alfabética, os resources do servidor
-// (FiveM/RedM) afetados entre dois commits. O repositório apontado é a pasta
-// "resources" do servidor: cada arquivo alterado é mapeado para o resource que
-// o contém. As pastas-categoria entre colchetes (ex.: "[gameplay]"), que o
-// FiveM usa apenas para agrupar resources, são ignoradas.
+// (FiveM/RedM) afetados entre dois commits. Cada arquivo alterado é mapeado
+// para o resource que o contém. O repositório pode apontar tanto para a raiz do
+// servidor quanto para a pasta "resources" — o resource é identificado pelo seu
+// manifesto (fxmanifest.lua/__resource.lua) no disco, então a profundidade do
+// caminho e as pastas-categoria entre colchetes (ex.: "[scripts]") não importam.
 func (p *Puller) changedResources(ctx context.Context, before, after string) []string {
 	// core.quotepath=false mantém caracteres não-ASCII legíveis no output.
 	out, err := exec.CommandContext(ctx, "git", "-C", p.repoPath,
@@ -142,7 +145,7 @@ func (p *Puller) changedResources(ctx context.Context, before, after string) []s
 	seen := make(map[string]struct{})
 	var resources []string
 	for _, line := range strings.Split(string(out), "\n") {
-		name := resourceName(line)
+		name := resourceName(p.repoPath, line)
 		if name == "" {
 			continue
 		}
@@ -156,31 +159,37 @@ func (p *Puller) changedResources(ctx context.Context, before, after string) []s
 	return resources
 }
 
-// resourceName extrai o nome do resource a partir do caminho de um arquivo
-// (relativo à pasta "resources"). Segmentos entre colchetes são categorias e
-// são ignorados; o resource é o primeiro segmento não-categoria que ainda
-// tenha um arquivo abaixo dele. Retorna "" quando o caminho não pertence a
-// nenhum resource (ex.: um arquivo solto na raiz ou dentro de uma categoria).
-func resourceName(path string) string {
-	segments := strings.Split(strings.TrimSpace(path), "/")
-	for i, seg := range segments {
-		if isCategory(seg) {
-			continue
+// resourceName devolve o nome do resource ao qual o arquivo file (caminho
+// relativo ao repositório, com "/" como separador, vindo do git) pertence. O
+// resource é o diretório-ancestral mais raso que contém um manifesto do FiveM
+// (fxmanifest.lua ou __resource.lua). Retorna "" quando o arquivo não está
+// dentro de nenhum resource ou quando o resource foi removido do disco.
+func resourceName(repoPath, file string) string {
+	file = strings.TrimSpace(file)
+	if file == "" {
+		return ""
+	}
+	segments := strings.Split(file, "/")
+	// Caminha do topo até (mas sem incluir) o próprio arquivo, procurando o
+	// primeiro diretório-ancestral que seja a raiz de um resource.
+	for i := 0; i < len(segments)-1; i++ {
+		dir := filepath.Join(repoPath, filepath.Join(segments[:i+1]...))
+		if isResourceDir(dir) {
+			return segments[i]
 		}
-		// Precisa haver ao menos mais um segmento abaixo (o arquivo) para que
-		// este segmento seja um diretório de resource, e não o próprio arquivo.
-		if i == len(segments)-1 {
-			return ""
-		}
-		return seg
 	}
 	return ""
 }
 
-// isCategory indica se um segmento de caminho é uma pasta-categoria do FiveM,
-// isto é, um nome entre colchetes como "[gameplay]" ou "[standalone]".
-func isCategory(seg string) bool {
-	return len(seg) >= 2 && strings.HasPrefix(seg, "[") && strings.HasSuffix(seg, "]")
+// isResourceDir indica se dir é a raiz de um resource do FiveM/RedM, isto é, se
+// contém um manifesto fxmanifest.lua ou __resource.lua.
+func isResourceDir(dir string) bool {
+	for _, manifest := range []string{"fxmanifest.lua", "__resource.lua"} {
+		if _, err := os.Stat(filepath.Join(dir, manifest)); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 func short(rev string) string {
