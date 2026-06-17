@@ -64,7 +64,7 @@ no GitHub:
    - Windows: `pull-automator_vX.Y.Z_windows_amd64.zip` (ou `arm64`);
    - Linux: `pull-automator_vX.Y.Z_linux_amd64.tar.gz` (ou `arm64`).
 3. Extraia o arquivo. Dentro vêm o executável, o `README.md` e o `.env.example`
-   (no Windows, também o `run.ps1`).
+   (no Windows, também o `run.ps1` e o `run.cmd`).
 4. Confira a integridade com o `SHA256SUMS.txt` da release, se quiser.
 
 > Mantenedores: para publicar uma nova versão, basta criar e empurrar uma tag
@@ -117,9 +117,15 @@ correspondente — e usar `-NonInteractive` para não perguntar nada (automaçã
 .\run.ps1 -NonInteractive -RepoPath C:\srv\meu-repo -Mode webhook -WebhookSecret "segredo-forte"
 ```
 
-> Se aparecer **"não está assinado digitalmente"** ao usar o `run.ps1`, libere
-> scripts para o seu usuário (uma vez só): `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
-> Como alternativa, chame o `.exe` direto (não sofre essa restrição).
+> **"não está assinado digitalmente" / execution policy?** Como o `run.ps1` veio
+> de um `.zip` baixado, o Windows o marca como "da internet" e o PowerShell
+> recusa scripts não assinados. Soluções:
+> - use o **`run.cmd`** (incluído no pacote) — ele chama o `run.ps1` já com a
+>   política contornada; arquivos `.cmd` não sofrem essa restrição;
+> - ou rode uma vez com `powershell -ExecutionPolicy Bypass -File .\run.ps1`;
+> - ou libere de vez: `Unblock-File .\run.ps1` e
+>   `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`;
+> - ou simplesmente chame o `.exe` direto (não sofre essa restrição).
 
 ### CMD (Prompt de Comando)
 

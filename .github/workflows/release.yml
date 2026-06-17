@@ -58,8 +58,8 @@ jobs:
           cd dist
           cp ../README.md ../.env.example .
           if [ "${{ matrix.goos }}" = "windows" ]; then
-            cp ../run.ps1 .
-            zip -q "${name}.zip" pull-automator.exe run.ps1 README.md .env.example
+            cp ../run.ps1 ../run.cmd .
+            zip -q "${name}.zip" pull-automator.exe run.ps1 run.cmd README.md .env.example
             echo "asset=dist/${name}.zip" >> "$GITHUB_OUTPUT"
           else
             tar -czf "${name}.tar.gz" pull-automator README.md .env.example
